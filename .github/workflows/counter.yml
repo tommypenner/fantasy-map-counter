@@ -1,0 +1,46 @@
+name: Handle Counter
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process-counter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Process Counter Action
+        run: |
+          # Read the issue title
+          ISSUE_TITLE=$(jq -r '.issue.title' "$GITHUB_EVENT_PATH")
+          
+          # Get the data file
+          DATA_FILE="data.json"
+          
+          if [ "$ISSUE_TITLE" = "reset" ]; then
+            # Reset the counter by updating the date
+            echo "{\"startDate\": \"$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")\"}" > $DATA_FILE
+          fi
+          
+          # Commit and push if there are changes
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          if [[ -n $(git status -s) ]]; then
+            git add $DATA_FILE
+            git commit -m "Update counter"
+            git push
+          fi
+          
+      - name: Close Issue
+        if: github.event_name == 'issues'
+        run: |
+          gh issue close ${{ github.event.issue.number }} -c "Counter processed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
